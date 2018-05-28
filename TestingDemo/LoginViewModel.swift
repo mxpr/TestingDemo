@@ -9,36 +9,49 @@
 import Foundation
 
 protocol LoginViewModel {
+    
+    // can be removed when using a Reactive framework
+    var viewModelDidUpdate: (() -> Void)? { get set }
     var showWelcomePrompt: (() -> Void)? { get set }
+    var loading: Bool { get }
     
     func wakeup()
     func sleep()
     func login()
     func signup()
+    
+    
 }
 
 protocol KeyValueStore {
-    func boolForKey(key: String) -> Bool
-    mutating func setBool(value: Bool, forKey: String)
+    func bool(forKey: String) -> Bool
+    mutating func set(_ value: Bool, forKey: String)
 }
 
 class DefaultLoginViewModel: LoginViewModel {
-    
     struct Constants {
         static let WelcomePromptDisplayedKey = "WelcomePromptDisplayedKey"
     }
     
-    var showWelcomePrompt: (() -> Void)? = nil
+    var showWelcomePrompt: (() -> Void)?
+    var viewModelDidUpdate: (() -> Void)?
+    
+    var loading: Bool = false {
+        didSet {
+            viewModelDidUpdate?()
+        }
+    }
+    
     private var keyValueStore: KeyValueStore
     init(keyValueStore: KeyValueStore) {
         self.keyValueStore = keyValueStore
     }
     
     func wakeup() {
-        let previouslyDisplayed = keyValueStore.boolForKey(Constants.WelcomePromptDisplayedKey)
+        let previouslyDisplayed = keyValueStore.bool(forKey: Constants.WelcomePromptDisplayedKey)
         if (!previouslyDisplayed) {
             showWelcomePrompt?()
-            keyValueStore.setBool(true, forKey: Constants.WelcomePromptDisplayedKey)
+            keyValueStore.set(true, forKey: Constants.WelcomePromptDisplayedKey)
         }
     }
     
@@ -47,7 +60,7 @@ class DefaultLoginViewModel: LoginViewModel {
     }
     
     func login() {
-        
+        loading = true
     }
     
     func signup() {
@@ -56,19 +69,24 @@ class DefaultLoginViewModel: LoginViewModel {
     
 }
 
-extension NSUserDefaults: KeyValueStore {
+extension UserDefaults: KeyValueStore {
     
 }
 
 class TestingLoginViewModel: LoginViewModel {
-    
     var showWelcomePrompt: (() -> Void)? = nil
+    var viewModelDidUpdate: (() -> Void)?
+    
+    var loading: Bool = false {
+        didSet {
+            viewModelDidUpdate?()
+        }
+    }
+    
     let beeper: Beeper = DarwinNotificationCenterBeeper()
     
     init() {
-    
-        
-        beeper.registerBeepHandler(BeeperConstants.TriggerWelcomePrompt) { [unowned self] in
+        beeper.registerBeepHandler(identifier: BeeperConstants.TriggerWelcomePrompt) { [unowned self] in
             self.showWelcomePrompt?()
         }
     }
@@ -82,13 +100,10 @@ class TestingLoginViewModel: LoginViewModel {
     }
     
     func login() {
-        
+        loading = true
     }
     
     func signup() {
         
     }
-    
 }
-
-

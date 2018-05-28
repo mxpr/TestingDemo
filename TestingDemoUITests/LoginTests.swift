@@ -15,41 +15,75 @@ class LoginTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
+        app = XCUIApplication()
     }
     
     override func tearDown() {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+        app = nil
         super.tearDown()
     }
-    
-    // MARK: - Helpers
-    func launch(app: XCUIApplication, useTestingViewModel: Bool = false) {
-        app.launchArguments = ["-ui-testing","YES"]
-        if useTestingViewModel {
-            app.launchArguments += ["-use-testing-view-model","YES"]
-        }
-        app.launch()
-    }
-    
-    
     
     // MARK: - Tests
     
     func testWelcomePrompt() {
-        app = XCUIApplication()
-        launch(app, useTestingViewModel: true)
+        launch(usingTestingViewModel: true)
         
         let alert = app.alerts["Welcome"]
         XCTAssertFalse(alert.exists)
         
-        beeper.beep(BeeperConstants.TriggerWelcomePrompt)
-        waitForElement(alert)
-        XCTAssertTrue(alert.exists)
+        beeper.beep(identifier: BeeperConstants.TriggerWelcomePrompt)
+        XCTAssertTrue(alert.waitForExistence(timeout: 2))
         
         alert.buttons["Close"].tap()
         XCTAssertFalse(alert.exists)
     }
     
+    func testLoadingSpinnerDisplayedWhileAuthenticating() {
+        launch(usingTestingViewModel: true)
+        
+        attemptLogin()
+  
+        // Spinner shopuld appear and fields should be disabled
+        XCTAssertTrue(app.staticTexts["Checking Credentials"].exists)
+        XCTAssertFalse(usernameTextFiled.isHittable)
+        XCTAssertFalse(passwordTextField.isHittable)
+        XCTAssertFalse(loginButton.isHittable)
+        XCTAssertFalse(signupButton.isHittable)
+    }
+    
+    // MARK: - Helpers
+    var usernameTextFiled: XCUIElement {
+        return app.textFields["Username"]
+    }
+    
+    var passwordTextField: XCUIElement {
+        return app.secureTextFields["Password"]
+    }
+    
+    var loginButton: XCUIElement {
+        return app.buttons["Log In"]
+    }
+    
+    var signupButton: XCUIElement {
+        return app.buttons["Sign Up"]
+    }
+    
+    func attemptLogin() {
+        usernameTextFiled.tap()
+        usernameTextFiled.typeText("user")
+        
+        passwordTextField.tap()
+        passwordTextField.typeText("password")
+        
+        loginButton.tap()
+    }
+    
+    func launch(usingTestingViewModel: Bool = false) {
+        app.launchArguments = ["-ui-testing", "YES"]
+        if usingTestingViewModel {
+            app.launchArguments += ["-use-testing-view-model", "YES"]
+        }
+        app.launch()
+    }
 }

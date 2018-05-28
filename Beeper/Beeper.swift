@@ -19,7 +19,7 @@ protocol Beeper {
     /// Registers a beep handler for a specific identifier.
     /// Upon receiving a "beep" with the matching identifier
     /// the handler is performed
-    func registerBeepHandler(identifier: String, handler: BeepHandler)
+    func registerBeepHandler(identifier: String, handler: @escaping BeepHandler)
     
     /// Unregister a beep handler for a specific identifier.
     /// Further "beeps" for this identifier will not
@@ -27,80 +27,113 @@ protocol Beeper {
     func unregisterBeepHandler(identifier: String)
 }
 
-// MARK: -
+// MARK: - DarwinNotificationCenterBeeper
 
 /// A Darwin Notification Center based Beeper implementation
 class DarwinNotificationCenterBeeper: Beeper {
     
-    let darwinNotificationCenter: CFNotificationCenter
-    let prefix: String
-    var handlers = [String: BeepHandler]()
-    init(prefix: String = "net.mxpr.utils.beeper.") {
+    private let darwinNotificationCenter: CFNotificationCenter
+    private let prefix: String
+    private var handlers = [String: BeepHandler]()
+    
+    
+    /// Constructs a DarwinNotificationCenter backed implementation of a "Beeper"
+    ///
+    /// - Parameter prefix: The prefix to use for notification names within the notification center
+    ///                     to avoid any potential clashes with other applications that may also
+    ///                     be using the notitication center API.
+    init(prefix: String = "net.mxpr.utils.beeper") {
         darwinNotificationCenter = CFNotificationCenterGetDarwinNotifyCenter()
-        self.prefix = prefix
+        self.prefix = prefix.appending(".")
     }
     
     deinit {
-        let mySelf = unsafeAddressOf(self)
         CFNotificationCenterRemoveObserver(darwinNotificationCenter,
-                                           mySelf,
+                                           rawPointerToSelf,
                                            nil,
                                            nil)
+        
     }
     
-    /// wrap identifier with a prefix to ensure no clashes with 
-    /// any other applications that may be using this API
-    func notificationName(identifier: String) -> String {
+    /// Constructs a notification name from the specified identifier
+    /// by wrapping it with the predefined prefix to avoid
+    /// potential clashes with other applications that may be
+    /// using the notification center API.
+    ///
+    /// - Parameter identifier: handler identifier
+    /// - Returns: The prefixed notification name
+    private func notificationName(from identifier: String) -> String {
         return "\(prefix)\(identifier)"
     }
     
-    func identifierFromName(name: String) -> String {
-        if let idx = name.rangeOfString(prefix)?.endIndex {
-            return name.substringFromIndex(idx)
+    
+    /// Extracts the identifier from the notification name
+    /// by stripping out the predefined prefix.
+    ///
+    /// - Parameter name: The notification name provided by the notification center
+    /// - Returns: The beep identifier (delt with publicly)
+    private func identifier(from name: String) -> String {
+        guard let prefixRange = name.range(of: prefix) else {
+            return name
         }
-        return name
+        return String(name[prefixRange.upperBound...])
     }
     
-    var unsafeSelf: UnsafePointer<Void> {
-        return unsafeAddressOf(self)
-    }
-    
-    func handleNotification(name: String) {
-        let identifier = identifierFromName(name)
-        if let handler = handlers[identifier] {
+    fileprivate func handleNotification(name: String) {
+        let handlerIdentifier = identifier(from: name)
+        if let handler = handlers[handlerIdentifier] {
             handler()
         }
     }
     
+    private var rawPointerToSelf: UnsafeRawPointer {
+        return UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
+    }
+    
     // MARK: - Beeper
+    
     func beep(identifier: String) {
-        let name = notificationName(identifier)
+        let name = notificationName(from: identifier)
         CFNotificationCenterPostNotification(darwinNotificationCenter,
-                                             name,
+                                             CFNotificationName(name as CFString),
                                              nil,
                                              nil,
                                              true)
     }
     
-    func registerBeepHandler(identifier: String, handler: BeepHandler) {
+    func registerBeepHandler(identifier: String, handler: @escaping BeepHandler) {
         handlers[identifier] = handler
-        let name = notificationName(identifier)
+        let name = notificationName(from: identifier)
         CFNotificationCenterAddObserver(darwinNotificationCenter,
-                                        unsafeSelf,
-                                        { (_, observer, name, _, _) in
-                                            let myself = Unmanaged<DarwinNotificationCenterBeeper>.fromOpaque(COpaquePointer(observer)).takeUnretainedValue()
-                                            myself.handleNotification(name as String)
-            },
-                                        name,
+                                        rawPointerToSelf,
+                                        handleDarwinNotification,
+                                        name as CFString,
                                         nil,
-                                        .DeliverImmediately)
+                                        .deliverImmediately)
+        
     }
     
     func unregisterBeepHandler(identifier: String) {
         handlers[identifier] = nil
+        let name = notificationName(from: identifier)
+        let cfNotificationName = CFNotificationName(name as CFString)
         CFNotificationCenterRemoveObserver(darwinNotificationCenter,
-                                           unsafeSelf,
-                                           notificationName(identifier),
+                                           rawPointerToSelf,
+                                           cfNotificationName,
                                            nil)
     }
+}
+
+fileprivate func handleDarwinNotification(notificationCenteR: CFNotificationCenter?,
+                                          observer: UnsafeMutableRawPointer?,
+                                          notificationName: CFNotificationName?,
+                                          unusedObject: UnsafeRawPointer?,
+                                          unusedUserInfo: CFDictionary?) -> Void {
+    guard let observer = observer,
+        let notificationName = notificationName else {
+            return
+    }
+    let beeper = Unmanaged<DarwinNotificationCenterBeeper>.fromOpaque(observer).takeUnretainedValue()
+    let name = (notificationName.rawValue as String)
+    beeper.handleNotification(name: name)
 }

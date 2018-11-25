@@ -19,12 +19,12 @@ protocol Beeper {
     /// Registers a beep handler for a specific identifier.
     /// Upon receiving a "beep" with the matching identifier
     /// the handler is performed
-    func registerBeepHandler(identifier: String, handler: @escaping BeepHandler)
+    func register(identifier: String, handler: @escaping BeepHandler)
     
     /// Unregister a beep handler for a specific identifier.
     /// Further "beeps" for this identifier will not
     /// cause the previously registered handler to be called
-    func unregisterBeepHandler(identifier: String)
+    func unregister(identifier: String)
 }
 
 // MARK: - DarwinNotificationCenterBeeper
@@ -101,7 +101,7 @@ class DarwinNotificationCenterBeeper: Beeper {
                                              true)
     }
     
-    func registerBeepHandler(identifier: String, handler: @escaping BeepHandler) {
+    func register(identifier: String, handler: @escaping BeepHandler) {
         handlers[identifier] = handler
         let name = notificationName(from: identifier)
         CFNotificationCenterAddObserver(darwinNotificationCenter,
@@ -113,7 +113,7 @@ class DarwinNotificationCenterBeeper: Beeper {
         
     }
     
-    func unregisterBeepHandler(identifier: String) {
+    func unregister(identifier: String) {
         handlers[identifier] = nil
         let name = notificationName(from: identifier)
         let cfNotificationName = CFNotificationName(name as CFString)

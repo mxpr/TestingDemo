@@ -27,7 +27,7 @@ class BeeperTests: XCTestCase {
     
     func testRegisteringNotificationsAreCalled() {
         let e = expectation(description: "test1 called")
-        subject.registerBeepHandler(identifier: "test1") {
+        subject.register(identifier: "test1") {
             e.fulfill()
         }
         
@@ -37,11 +37,11 @@ class BeeperTests: XCTestCase {
     }
     
     func testUnRegisteringNotificationsAreNotCalled() {
-        subject.registerBeepHandler(identifier: "test1") {
+        subject.register(identifier: "test1") {
             XCTFail("handler should not be called")
         }
         
-        subject.unregisterBeepHandler(identifier: "test1")
+        subject.unregister(identifier: "test1")
         subject.beep(identifier: "test1")
     }
 }

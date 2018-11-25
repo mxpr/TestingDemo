@@ -86,7 +86,7 @@ class TestingLoginViewModel: LoginViewModel {
     let beeper: Beeper = DarwinNotificationCenterBeeper()
     
     init() {
-        beeper.registerBeepHandler(identifier: BeeperConstants.TriggerWelcomePrompt) { [unowned self] in
+        beeper.register(identifier: BeeperConstants.TriggerWelcomePrompt) { [unowned self] in
             self.showWelcomePrompt?()
         }
     }
